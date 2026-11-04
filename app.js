@@ -11,38 +11,14 @@ const firebaseConfig = {
   appId: "1:793079994609:web:cac7a7634ea1170f0df150"
 };
 
-// --- FUNÇÃO PARA GERAR O SOM DA URNA ELETRÔNICA (WEB AUDIO API) ---
+// --- REPRODUÇÃO DO ÁUDIO MP3 LOCAL DA URNA ELETRÔNICA ---
 const playUrnaSound = () => {
   try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
-
-    // Primeiro tom (grave)
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(1200, ctx.currentTime);
-    gain1.gain.setValueAtTime(0.3, ctx.currentTime);
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-
-    // Segundo tom (agudo - característico do pilili)
-    const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(1400, ctx.currentTime);
-    gain2.gain.setValueAtTime(0.3, ctx.currentTime + 0.15);
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
-
-    // Execução dos sons
-    osc1.start(ctx.currentTime);
-    osc1.stop(ctx.currentTime + 0.15);
-    osc2.start(ctx.currentTime + 0.15);
-    osc2.stop(ctx.currentTime + 0.45);
+    const audio = new Audio("urna.mp3");
+    audio.currentTime = 0;
+    audio.play().catch(e => console.warn("Aviso ao reproduzir áudio:", e));
   } catch (e) {
-    console.warn("Áudio não permitido ou indisponível:", e);
+    console.warn("Arquivo de áudio não encontrado ou indisponível:", e);
   }
 };
 
@@ -56,6 +32,7 @@ function App() {
   const [db, setDb] = useState(null);
   const [isFirebaseConnected, setIsFirebaseConnected] = useState(false);
   
+  // Identificador do totem e tipo de gráfico no Admin
   const [totemId, setTotemId] = useState(() => localStorage.getItem('totem_id') || 'Totem 01');
   const [chartType, setChartType] = useState('doughnut');
   
@@ -63,7 +40,7 @@ function App() {
   const chartInstance = useRef(null);
   const reportRef = useRef(null);
 
-  // Prevenção de descanso de tela (Wake Lock API)
+  // Prevenção de descanso de tela (Screen Wake Lock API)
   useEffect(() => {
     let wakeLock = null;
     const requestWakeLock = async () => {
@@ -87,7 +64,7 @@ function App() {
     };
   }, []);
 
-  // Trava de teclado (Apenas a tecla ESC abre o modal)
+  // Trava de teclado (Apenas a tecla ESC abre o modal de desbloqueio)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' || e.keyCode === 27) {
@@ -104,6 +81,7 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [showUnlockModal]);
 
+  // Atualização dinâmica dos ícones Lucide
   useEffect(() => {
     if (window.lucide) {
       window.lucide.createIcons();
@@ -115,7 +93,7 @@ function App() {
     localStorage.setItem('totem_id', id);
   };
 
-  // Inicialização do Firebase
+  // Inicialização do Firebase Realtime Database
   useEffect(() => {
     try {
       if (!firebase.apps.length) {
@@ -132,7 +110,7 @@ function App() {
     setVotes(localVotes);
   }, []);
 
-  // Escuta dados do Realtime Database
+  // Escuta registros em tempo real entre totens
   useEffect(() => {
     if (!db) return;
     
@@ -158,9 +136,9 @@ function App() {
     return () => votesRef.off();
   }, [db]);
 
-  // Função para registrar o voto + Tocar Som da Urna
+  // Registrar voto + Tocar urna.mp3
   const handleVote = async (opinion, label) => {
-    // Toca o som da urna ao votar
+    // Dispara o som da urna eletrônica imediatamente ao clicar/tocar
     playUrnaSound();
 
     const newVote = {
@@ -172,6 +150,7 @@ function App() {
       timestamp: new Date().toISOString()
     };
 
+    // Altera instantaneamente para a tela de confirmação
     setView('thankyou');
 
     if (db) {
@@ -186,11 +165,13 @@ function App() {
       localStorage.setItem('totem_votes', JSON.stringify(updatedLocal));
     }
 
+    // Retorna para a tela inicial de votação após 2,5 segundos
     setTimeout(() => {
       setView('vote');
     }, 2500);
   };
 
+  // Zerar banco de dados
   const handleClearDatabase = async () => {
     if (db) {
       try {
@@ -205,6 +186,7 @@ function App() {
     setShowClearModal(false);
   };
 
+  // Autenticação de Admin (senha: senai2026)
   const handleUnlock = (e) => {
     e.preventDefault();
     if (passwordInput === 'senai2026') {
@@ -217,6 +199,7 @@ function App() {
     }
   };
 
+  // Exportar dados para CSV
   const exportCSV = () => {
     if (votes.length === 0) return alert("Não há votos registrados.");
     
@@ -234,6 +217,7 @@ function App() {
     document.body.removeChild(link);
   };
 
+  // Exportar relatório em PDF
   const exportPDF = () => {
     if (votes.length === 0) return alert("Não há dados para gerar PDF.");
     const element = reportRef.current;
@@ -249,6 +233,7 @@ function App() {
     html2pdf().set(opt).from(element).save();
   };
 
+  // Renderização de gráficos no Admin
   useEffect(() => {
     if (view === 'admin' && chartRef.current) {
       if (chartInstance.current) {
@@ -294,6 +279,7 @@ function App() {
   return (
     <div className="h-screen w-screen flex flex-col justify-between p-4 sm:p-8 bg-senai-deepbg text-slate-100 relative select-none">
       
+      {/* Botão sutil de Configuração/Admin */}
       <button 
         onClick={() => setShowUnlockModal(true)}
         className="absolute top-4 right-4 opacity-20 hover:opacity-100 transition-opacity bg-senai-darkblue text-slate-300 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold z-50"
@@ -328,6 +314,7 @@ function App() {
 
           <main className="grid grid-cols-1 md:grid-cols-3 gap-6 my-auto py-4">
             
+            {/* Opção Muito Satisfeito */}
             <button
               onClick={() => handleVote('muito_satisfeito', 'Muito Satisfeito')}
               className="group bg-senai-darkblue/90 hover:bg-senai-darkblue active:scale-95 transition-all duration-200 rounded-3xl p-8 flex flex-col items-center justify-between border-2 border-emerald-500/80 shadow-[0_0_30px_rgba(16,185,129,0.2)] min-h-[300px]"
@@ -341,6 +328,7 @@ function App() {
               </div>
             </button>
 
+            {/* Opção Satisfeito */}
             <button
               onClick={() => handleVote('satisfeito', 'Satisfeito')}
               className="group bg-senai-darkblue/90 hover:bg-senai-darkblue active:scale-95 transition-all duration-200 rounded-3xl p-8 flex flex-col items-center justify-between border-2 border-amber-500/80 shadow-[0_0_30px_rgba(245,158,11,0.2)] min-h-[300px]"
@@ -354,6 +342,7 @@ function App() {
               </div>
             </button>
 
+            {/* Opção Insatisfeito */}
             <button
               onClick={() => handleVote('insatisfeito', 'Insatisfeito')}
               className="group bg-senai-darkblue/90 hover:bg-senai-darkblue active:scale-95 transition-all duration-200 rounded-3xl p-8 flex flex-col items-center justify-between border-2 border-rose-500/80 shadow-[0_0_30px_rgba(239,68,68,0.2)] min-h-[300px]"
@@ -375,18 +364,18 @@ function App() {
         </div>
       )}
 
-      {/* --- TELA DE AGRADECIMENTO --- */}
+      {/* --- TELA DE AGRADECIMENTO (CONFIRMAÇÃO DO VOTO) --- */}
       {view === 'thankyou' && (
         <div className="h-full flex flex-col items-center justify-center text-center space-y-6">
           <div className="w-24 h-24 bg-emerald-500/15 text-emerald-400 rounded-full flex items-center justify-center border-2 border-emerald-500/40 animate-bounce shadow-2xl shadow-emerald-500/20">
             <i data-lucide="check" className="w-12 h-12"></i>
           </div>
-          <h2 className="text-4xl sm:text-6xl font-black font-display text-white">Muito Obrigado!</h2>
+          <h2 className="text-4xl sm:text-6xl font-black font-display text-white">Voto Confirmado!</h2>
           <p className="text-slate-300 text-xl sm:text-2xl">Sua avaliação ajuda a fortalecer a indústria do Paraná.</p>
         </div>
       )}
 
-      {/* --- TELA DE ADMIN --- */}
+      {/* --- PAINEL ADMIN DE RELATÓRIOS --- */}
       {view === 'admin' && (
         <div className="h-full flex flex-col overflow-y-auto max-w-6xl mx-auto w-full p-2">
           
@@ -515,7 +504,7 @@ function App() {
         </div>
       )}
 
-      {/* --- MODAL CONFIRMAÇÃO DE LIMPEZA --- */}
+      {/* --- MODAL CONFIRMAÇÃO DE LIMPEZA DO BANCO --- */}
       {showClearModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-senai-darkblue border border-rose-900/60 p-6 rounded-3xl max-w-sm w-full space-y-4 text-center shadow-2xl">
@@ -543,7 +532,7 @@ function App() {
         </div>
       )}
 
-      {/* --- MODAL DE SENHA (senai2026) --- */}
+      {/* --- MODAL DE SENHA DE ACESSO (senai2026) --- */}
       {showUnlockModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <form onSubmit={handleUnlock} className="bg-senai-darkblue border border-slate-700 p-6 rounded-3xl max-w-sm w-full space-y-4 shadow-2xl">
