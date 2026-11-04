@@ -11,14 +11,23 @@ const firebaseConfig = {
   appId: "1:793079994609:web:cac7a7634ea1170f0df150"
 };
 
-// --- REPRODUÇÃO DO ÁUDIO MP3 LOCAL DA URNA ELETRÔNICA ---
+// --- REPRODUÇÃO DO ÁUDIO MP3 DA URNA (COMPATÍVEL COM GITHUB PAGES E LIVE SERVER) ---
 const playUrnaSound = () => {
   try {
-    const audio = new Audio("urna.mp3");
+    // URL dinâmica que resolve o caminho exato no GitHub Pages (subpasta do repositório)
+    const audioPath = new URL('urna.mp3', window.location.href).href;
+    const audio = new Audio(audioPath);
+    
     audio.currentTime = 0;
-    audio.play().catch(e => console.warn("Aviso ao reproduzir áudio:", e));
+    
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(e => {
+        console.warn("Aviso ao reproduzir o arquivo urna.mp3:", e);
+      });
+    }
   } catch (e) {
-    console.warn("Arquivo de áudio não encontrado ou indisponível:", e);
+    console.warn("Erro ao carregar o arquivo de áudio:", e);
   }
 };
 
@@ -32,7 +41,7 @@ function App() {
   const [db, setDb] = useState(null);
   const [isFirebaseConnected, setIsFirebaseConnected] = useState(false);
   
-  // Identificador do totem e tipo de gráfico no Admin
+  // Identificador da máquina e tipo de gráfico no Admin
   const [totemId, setTotemId] = useState(() => localStorage.getItem('totem_id') || 'Totem 01');
   const [chartType, setChartType] = useState('doughnut');
   
@@ -110,7 +119,7 @@ function App() {
     setVotes(localVotes);
   }, []);
 
-  // Escuta registros em tempo real entre totens
+  // Sincronização em tempo real dos votos
   useEffect(() => {
     if (!db) return;
     
@@ -136,9 +145,9 @@ function App() {
     return () => votesRef.off();
   }, [db]);
 
-  // Registrar voto + Tocar urna.mp3
+  // Registrar voto + Disparar áudio urna.mp3
   const handleVote = async (opinion, label) => {
-    // Dispara o som da urna eletrônica imediatamente ao clicar/tocar
+    // Toca o áudio MP3 da urna imediatamente
     playUrnaSound();
 
     const newVote = {
@@ -150,7 +159,7 @@ function App() {
       timestamp: new Date().toISOString()
     };
 
-    // Altera instantaneamente para a tela de confirmação
+    // Altera para a tela de agradecimento
     setView('thankyou');
 
     if (db) {
@@ -165,7 +174,7 @@ function App() {
       localStorage.setItem('totem_votes', JSON.stringify(updatedLocal));
     }
 
-    // Retorna para a tela inicial de votação após 2,5 segundos
+    // Retorna para a tela principal de votação após 2,5s
     setTimeout(() => {
       setView('vote');
     }, 2500);
@@ -186,7 +195,7 @@ function App() {
     setShowClearModal(false);
   };
 
-  // Autenticação de Admin (senha: senai2026)
+  // Autenticação Admin (senha: senai2026)
   const handleUnlock = (e) => {
     e.preventDefault();
     if (passwordInput === 'senai2026') {
@@ -199,7 +208,7 @@ function App() {
     }
   };
 
-  // Exportar dados para CSV
+  // Exportar relatórios em CSV
   const exportCSV = () => {
     if (votes.length === 0) return alert("Não há votos registrados.");
     
@@ -233,7 +242,7 @@ function App() {
     html2pdf().set(opt).from(element).save();
   };
 
-  // Renderização de gráficos no Admin
+  // Renderização e atualização dos gráficos
   useEffect(() => {
     if (view === 'admin' && chartRef.current) {
       if (chartInstance.current) {
@@ -279,7 +288,7 @@ function App() {
   return (
     <div className="h-screen w-screen flex flex-col justify-between p-4 sm:p-8 bg-senai-deepbg text-slate-100 relative select-none">
       
-      {/* Botão sutil de Configuração/Admin */}
+      {/* Botão sutil para abrir o modal de senha (ESC) */}
       <button 
         onClick={() => setShowUnlockModal(true)}
         className="absolute top-4 right-4 opacity-20 hover:opacity-100 transition-opacity bg-senai-darkblue text-slate-300 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold z-50"
@@ -364,7 +373,7 @@ function App() {
         </div>
       )}
 
-      {/* --- TELA DE AGRADECIMENTO (CONFIRMAÇÃO DO VOTO) --- */}
+      {/* --- TELA DE AGRADECIMENTO --- */}
       {view === 'thankyou' && (
         <div className="h-full flex flex-col items-center justify-center text-center space-y-6">
           <div className="w-24 h-24 bg-emerald-500/15 text-emerald-400 rounded-full flex items-center justify-center border-2 border-emerald-500/40 animate-bounce shadow-2xl shadow-emerald-500/20">
